@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Contract, isAddress } from 'ethers'
 import { GOVERNANCE_ABI, SAFE_ABI } from './abi'
 import {
@@ -38,6 +38,54 @@ type Review = {
   safeTxHash: string
   limit: bigint
   approvals: OwnerApproval[]
+}
+
+function WalletBar() {
+  const wallet = useMetaMask()
+
+  if (!wallet.isConnected) {
+    return (
+      <button
+        type="button"
+        className="btn btn--header"
+        disabled={wallet.connecting || !wallet.hasMetaMask}
+        onClick={() => void wallet.connect()}
+      >
+        {wallet.connecting ? 'Подключение…' : 'MetaMask'}
+      </button>
+    )
+  }
+
+  return (
+    <div className="wallet-bar">
+      <span className="wallet-bar__chain">{wallet.chainName}</span>
+      <span className="wallet-bar__addr">{shortAddress(wallet.address!)}</span>
+      <button
+        type="button"
+        className="btn btn--header btn--header-ghost"
+        onClick={() => void wallet.disconnect()}
+      >
+        Отключить
+      </button>
+    </div>
+  )
+}
+
+function PageShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="page">
+      <header className="header">
+        <div className="header__inner">
+          <div className="brand">
+            <p className="brand__title">MySafe</p>
+            <p className="brand__subtitle">Mint limit через Gnosis Safe</p>
+          </div>
+          <WalletBar />
+        </div>
+      </header>
+      <main className="main">{children}</main>
+    </div>
+  )
 }
 
 function DisconnectedView({
@@ -187,6 +235,11 @@ export function SafeApp() {
   const isOwner = useMemo(() => {
     if (!wallet.address || !safeInfo) return false
     return safeInfo.owners.some((o) => o.toLowerCase() === wallet.address!.toLowerCase())
+  }, [wallet.address, safeInfo])
+
+  const knownNonOwner = useMemo(() => {
+    if (!wallet.address || !safeInfo) return false
+    return !safeInfo.owners.some((o) => o.toLowerCase() === wallet.address!.toLowerCase())
   }, [wallet.address, safeInfo])
 
   const { isConnected, getProvider, chainId: walletChainId } = wallet
@@ -544,13 +597,19 @@ export function SafeApp() {
 
   if (!wallet.isConnected) {
     return (
-      <DisconnectedView
-        onConnect={() => void wallet.connect()}
-        connecting={wallet.connecting}
-        error={wallet.error}
-        hasMetaMask={wallet.hasMetaMask}
-      />
+      <PageShell>
+        <DisconnectedView
+          onConnect={() => void wallet.connect()}
+          connecting={wallet.connecting}
+          error={wallet.error}
+          hasMetaMask={wallet.hasMetaMask}
+        />
+      </PageShell>
     )
+  }
+
+  if (knownNonOwner) {
+    return null
   }
 
   const approvedCount = review?.approvals.filter((a) => a.approved).length ?? 0
@@ -568,7 +627,8 @@ export function SafeApp() {
   const pendingExplorer = pendingHash ? getExplorerTxUrl(chainId, pendingHash) : null
 
   return (
-    <section className="card">
+    <PageShell>
+      <section className="card">
       <div className="stack">
         <div>
           <div className="mode-tabs" role="tablist" aria-label="Режим">
@@ -716,11 +776,7 @@ export function SafeApp() {
                   <div className="meta-box__row">
                     <dt className="meta-box__label">Ваш статус</dt>
                     <dd className="meta-box__value">
-                      {isOwner ? (
-                        <span className="badge badge--ok">owner</span>
-                      ) : (
-                        <span className="badge badge--warn">не owner</span>
-                      )}
+                      <span className="badge badge--ok">owner</span>
                     </dd>
                   </div>
                 </>
@@ -968,5 +1024,6 @@ export function SafeApp() {
         )}
       </div>
     </section>
+    </PageShell>
   )
 }
