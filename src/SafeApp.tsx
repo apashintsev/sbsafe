@@ -609,7 +609,27 @@ export function SafeApp() {
   }
 
   if (knownNonOwner) {
-    return null
+    return (
+      <PageShell>
+        <section className="card card--centered">
+          <h2 className="card__heading">Нет доступа</h2>
+          <p className="card__text">
+            Подключённый адрес не является owner этого Safe. Интерфейс доступен
+            только владельцам.
+          </p>
+          <p className="field__hint" style={{ marginBottom: 16 }}>
+            {wallet.address}
+          </p>
+          <button
+            type="button"
+            className="btn btn--secondary btn--large"
+            onClick={() => void wallet.disconnect()}
+          >
+            Отключить
+          </button>
+        </section>
+      </PageShell>
+    )
   }
 
   const approvedCount = review?.approvals.filter((a) => a.approved).length ?? 0
