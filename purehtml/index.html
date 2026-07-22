@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MySafe</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <div class="header__inner">
+          <div class="brand">
+            <p class="brand__title">MySafe</p>
+            <p class="brand__subtitle">Mint limit через Gnosis Safe</p>
+          </div>
+          <div id="wallet-bar" class="wallet-bar"></div>
+        </div>
+      </header>
+
+      <main class="main">
+        <!-- Disconnected -->
+        <section id="view-disconnected" class="card card--centered" hidden>
+          <div class="card__icon" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="24" cy="24" r="22" stroke="currentColor" strokeWidth="2" />
+              <path
+                d="M16 24h16M24 16v16"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+          <h2 class="card__heading">Подключите MetaMask</h2>
+          <p class="card__text">
+            Чтобы создать предложение setMintLimit или подписать уже существующее,
+            подключите MetaMask владельца Safe.
+          </p>
+          <p id="mm-missing" class="message message--error" style="margin-bottom: 16px" hidden>
+            MetaMask не найден. Установите расширение и обновите страницу.
+          </p>
+          <p id="connect-error" class="message message--error" style="margin-bottom: 16px" hidden></p>
+          <button type="button" id="btn-connect" class="btn btn--primary btn--large">
+            Подключить MetaMask
+          </button>
+        </section>
+
+        <!-- Non-owner -->
+        <section id="view-non-owner" class="card card--centered" hidden>
+          <h2 class="card__heading">Нет доступа</h2>
+          <p class="card__text">
+            Подключённый адрес не является owner этого Safe. Интерфейс доступен только
+            владельцам.
+          </p>
+          <p id="non-owner-addr" class="field__hint" style="margin-bottom: 16px"></p>
+          <button type="button" id="btn-disconnect-non-owner" class="btn btn--secondary btn--large">
+            Отключить
+          </button>
+        </section>
+
+        <!-- Main app -->
+        <section id="view-app" class="card" hidden>
+          <div class="stack">
+            <div>
+              <div class="mode-tabs" role="tablist" aria-label="Режим">
+                <button
+                  type="button"
+                  id="tab-create"
+                  role="tab"
+                  class="mode-tabs__item mode-tabs__item--active"
+                  aria-selected="true"
+                >
+                  Создание
+                </button>
+                <button
+                  type="button"
+                  id="tab-signing"
+                  role="tab"
+                  class="mode-tabs__item"
+                  aria-selected="false"
+                  disabled
+                  title="Появится автоматически, если по этим параметрам уже есть approveHash"
+                >
+                  Подписание
+                </button>
+              </div>
+              <p class="field__hint" style="margin-bottom: 8px">
+                Сеть: <strong id="chain-name">—</strong>
+                <span id="probing-hint" hidden> · проверяем предложение…</span>
+              </p>
+              <div class="field__inline-options">
+                <button type="button" class="chip chip--btn" data-chain="1">Ethereum</button>
+                <button type="button" class="chip chip--btn" data-chain="11155111">Sepolia</button>
+              </div>
+              <p id="unsupported-chain" class="message message--error" style="margin-top: 12px" hidden>
+                Выберите Ethereum Mainnet или Sepolia в MetaMask.
+              </p>
+            </div>
+
+            <div id="mode-body" class="mode-body mode-body--create">
+              <div class="stack">
+                <label class="field">
+                  <span class="field__label">Адрес Safe</span>
+                  <input
+                    id="safe-input"
+                    class="field__input field__input--mono"
+                    placeholder="0x…"
+                    spellcheck="false"
+                  />
+                  <p id="safe-invalid" class="field__hint" style="color: #b91c1c" hidden>
+                    Некорректный адрес
+                  </p>
+                  <p id="safe-explorer" class="field__hint" hidden>
+                    <a href="#" target="_blank" rel="noreferrer" class="message__link"
+                      >Открыть Safe в explorer</a
+                    >
+                  </p>
+                </label>
+
+                <label class="field">
+                  <span class="field__label">Governance proxy</span>
+                  <input
+                    id="governance-input"
+                    class="field__input field__input--mono"
+                    placeholder="0x…"
+                    spellcheck="false"
+                  />
+                </label>
+
+                <label class="field">
+                  <span class="field__label">Mint limit account</span>
+                  <input
+                    id="mint-account-input"
+                    class="field__input field__input--mono"
+                    placeholder="0x… account для setMintLimit"
+                    spellcheck="false"
+                  />
+                </label>
+              </div>
+
+              <dl id="safe-meta" class="meta-box" hidden>
+                <div class="meta-box__row" id="safe-meta-status" hidden>
+                  <dt class="meta-box__label">Статус</dt>
+                  <dd class="meta-box__value">Загрузка…</dd>
+                </div>
+                <div class="meta-box__row" id="safe-meta-error" hidden>
+                  <dt class="meta-box__label">Ошибка</dt>
+                  <dd class="meta-box__value" style="color: #b91c1c"></dd>
+                </div>
+                <div class="meta-box__row" id="safe-meta-threshold" hidden>
+                  <dt class="meta-box__label">Threshold</dt>
+                  <dd class="meta-box__value"></dd>
+                </div>
+                <div class="meta-box__row" id="safe-meta-nonce" hidden>
+                  <dt class="meta-box__label">Nonce</dt>
+                  <dd class="meta-box__value meta-box__value--mono"></dd>
+                </div>
+                <div class="meta-box__row" id="safe-meta-owner" hidden>
+                  <dt class="meta-box__label">Ваш статус</dt>
+                  <dd class="meta-box__value">
+                    <span class="badge badge--ok">owner</span>
+                  </dd>
+                </div>
+                <div class="meta-box__row">
+                  <dt class="meta-box__label">Текущий actualMintLimit</dt>
+                  <dd class="meta-box__value meta-box__value--mono" id="mint-limit-value">—</dd>
+                </div>
+                <div class="btn-row">
+                  <button type="button" id="btn-refresh-info" class="btn btn--ghost btn--compact">
+                    Обновить info
+                  </button>
+                </div>
+              </dl>
+
+              <div class="stack">
+                <div class="field">
+                  <span class="field__label">Единицы лимита</span>
+                  <div class="field__inline-options">
+                    <label class="chip">
+                      <input type="radio" name="limitMode" value="raw" checked />
+                      Raw
+                    </label>
+                    <label class="chip">
+                      <input type="radio" name="limitMode" value="human" />
+                      Human (6 decimals)
+                    </label>
+                  </div>
+                </div>
+
+                <label class="field">
+                  <span class="field__label">Новый лимит</span>
+                  <input
+                    id="limit-input"
+                    class="field__input field__input--mono"
+                    placeholder="например 1000000000"
+                  />
+                </label>
+              </div>
+
+              <p id="msg-create-hint" class="message message--info" hidden>
+                Предложения с этими параметрами ещё нет. Можно создать первую подпись
+                (approveHash).
+              </p>
+              <p id="msg-signing-hint" class="message message--info mode-enter" hidden>
+                Найдено существующее предложение: уже есть on-chain approveHash. Можно
+                подписать или исполнить.
+              </p>
+
+              <dl id="review-box" class="meta-box" hidden>
+                <div class="meta-box__row">
+                  <dt class="meta-box__label">Limit raw</dt>
+                  <dd class="meta-box__value meta-box__value--mono" id="review-limit"></dd>
+                </div>
+                <div class="meta-box__row">
+                  <dt class="meta-box__label">Safe tx hash</dt>
+                  <dd class="meta-box__value meta-box__value--mono" id="review-hash"></dd>
+                </div>
+                <div class="meta-box__row" id="review-calldata-row" hidden>
+                  <dt class="meta-box__label">Calldata</dt>
+                  <dd class="meta-box__value meta-box__value--mono" id="review-calldata"></dd>
+                </div>
+                <div class="meta-box__row" id="review-approvals-row" hidden>
+                  <dt class="meta-box__label">Approvals</dt>
+                  <dd class="meta-box__value" id="review-approvals"></dd>
+                </div>
+              </dl>
+
+              <p id="msg-probe-error" class="message message--error" hidden></p>
+              <p id="msg-error" class="message message--error" hidden></p>
+              <p id="msg-success" class="message message--success" hidden></p>
+              <p id="msg-busy" class="message message--info" hidden></p>
+
+              <div class="btn-row btn-row--end">
+                <button type="button" id="btn-create" class="btn btn--primary">
+                  Создать предложение
+                </button>
+                <button type="button" id="btn-approve" class="btn btn--secondary" hidden>
+                  Подписать
+                </button>
+                <button type="button" id="btn-execute" class="btn btn--primary" hidden>
+                  Execute
+                </button>
+              </div>
+            </div>
+
+            <div id="owners-panel" class="stack--tight owners-panel" hidden>
+              <h3 class="section-title" style="font-size: 1rem; margin-bottom: 4px">
+                Статус подписания (<span id="owners-count">0</span>)
+              </h3>
+              <ul id="owners-list" class="owners"></ul>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./ethers.umd.min.js"></script>
+    <script src="./env.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
