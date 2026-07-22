@@ -17,7 +17,7 @@ const mimeTypes = {
 http
   .createServer((req, res) => {
     let filePath = path.join(
-      process.cwd(),
+      __dirname,
       req.url === "/" ? "index.html" : req.url,
     );
 
